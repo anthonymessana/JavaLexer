@@ -16,14 +16,17 @@ class Lexer(filename: String):
     val source = RandomAccessFile(filename, "r")
     private def nextChar = if source.getFilePointer < source.length then Some(source.read().toChar) else None
     
-    def isOctal(c: Char) = 0 <= '7' - c && '7' - c <= 7
-    def isHex(c: Char) = c.isDigit || 0 <= 'F' - c.toUpper && 'F' - c.toUpper <= 5
-    def isOperator(c: Char) = 
+    private def isOctal(c: Char) = 0 <= '7' - c && '7' - c <= 7
+    private def isHex(c: Char) = c.isDigit || 0 <= 'F' - c.toUpper && 'F' - c.toUpper <= 5
+    private def isOperator(c: Char) = 
         c == '+' || c == '-' || c == '/' || c == '*' || c == '%' ||
         c == '<' || c == '>' || c == '&' || c == '|' || c == '!' ||
         c == '=' || c == '^'
-    
-    def isSingleOp(c: Char) = c == '!' || c == '^' || c == '*' || c == '/' || c == '%'
+    // these are operators that do not form another operator if repeated twice
+    private def isSingleOp(c: Char) = c == '!' || c == '^' || c == '*' || c == '/' || c == '%'
+    private def isEscapeChar(c: Char) = 
+        c == 't' || c == 'b' || c == 'n' || c == 'r' ||
+        c == 'f' || c == '\'' || c == '"' || c == '\\' 
 
     def identifier(lexeme: String): (Token, Long) =
         nextChar match
@@ -67,9 +70,7 @@ class Lexer(filename: String):
             case Some(c) if c == '\\' => 
                 nextChar match
                     case Some(la) => 
-                        if la == 't' || la == 'b' || la == 'n' || la == 'r' ||
-                            la == 'f' || la == '\'' || la == '"' || la == '\\' 
-                        then
+                        if isEscapeChar(la) then
                             stringLiteral(lexeme + s"\\$la".translateEscapes)
                         else
                             stringLiteral(lexeme + la)
@@ -80,8 +81,7 @@ class Lexer(filename: String):
     def operator(lexeme: String): (Token, Long) =
         nextChar match
             case Some(c) 
-                if lexeme.length == 1 && isOperator(c) && c == '=' || 
-                lexeme.charAt(0) == c && !isSingleOp(c)
+                if lexeme.length == 1 && isOperator(c) && c == '=' || lexeme.charAt(0) == c && !isSingleOp(c)
                 => operator(lexeme + c)
             case Some('=') if lexeme == ">>" || lexeme == "<<" => operator(lexeme + '=')
             case Some(c) if !isOperator(c) => (Token.Operator(lexeme), source.getFilePointer)
@@ -92,7 +92,7 @@ class Lexer(filename: String):
         source.seek(pos)
         nextChar match
             case Some(c) =>
-                val curLexeme = "" + c
+                val curLexeme = c.toString
                 if c.isWhitespace then
                     nextToken(pos + 1) 
                 else if c.isLetter || c == '_' || c == '$' then 
