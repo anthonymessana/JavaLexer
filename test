@@ -1,1 +1,6 @@
-0b111 120 0xAF 0xAG 012 09 assert true false 12.3 10.05d 108.2f 99.8F 012.05 "Hello,World!\n\" _Hello$_World123 ++ -- += >>=
+for (int i = 0; i < nums.length; ++i) {
+    if (set.contains(nums[i])) {
+        return true;
+    }
+    set.add(nums[i]);
+}
