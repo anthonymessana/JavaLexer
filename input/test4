@@ -1,0 +1,7 @@
+public class LexerTest4 {
+    public static void main(String[] args) {
+        // This is a single-line comment
+        int value = 100; /* This is a multi-line 
+                            comment */
+    }
+}

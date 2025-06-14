@@ -1,0 +1,6 @@
+public class LexerTest3 {
+    public static void main(String[] args) {
+        String escaped = "Tab:\tNewline:\nQuote:\"Backslash:\\";
+        char letter = 'A';
+    }
+}

@@ -1,0 +1,7 @@
+public class LexerTest5 {
+    public static void main(String[] args) {
+        int αβγ = 123;  // Unicode variable
+        int $valid = 10; // Special character in variable name
+        int invalid@name = 5; // Invalid identifier (Lexer should flag an error)
+    }
+}

@@ -1,0 +1,7 @@
+public class LexerTest1 {
+    public static void main(String[] args) {
+        int number = 42;
+        String message = "Hello, world!";
+        System.out.println(message);
+    }
+}

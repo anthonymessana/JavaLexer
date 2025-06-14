@@ -1,0 +1,6 @@
+public class LexerTest2 {
+    public static void main(String[] args) {
+        int x = 10 + 5 * (3 - 1) / 2;
+        boolean flag = (x == 10) && (x > 5) || (x < 20);
+    }
+}
