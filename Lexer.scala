@@ -13,11 +13,7 @@ enum Token:
     case Comment(value: String)
     case Invalid
     case EOF
-/* 
-TODO: 
-    Use peek + skipChar instead of nextChar, as nextChar causes separators at the end of literals 
-    and identifiers to be skipped in the subsequent call to nextToken.
-*/
+
 class Lexer(filename: String):
     val source = RandomAccessFile(filename, "r")
     def index = source.getFilePointer
@@ -45,34 +41,35 @@ class Lexer(filename: String):
     
     private def isEscapeChar(c: Char) = 
         c == 't' || c == 'b' || c == 'n' || c == 'r' ||
-        c == 'f' || c == '\'' || c == '"' || c == '\\' 
+        c == 'f' || c == '\'' || c == '"' || c == '\\'
     
     private def isSeparator(c: Char) = 
         c == '{' || c == '}' || c == ';' || c == ',' ||
         c == '(' || c == ')' || c == '[' || c == ']' ||
-        c == '.' || c == ':' || c == '@' 
+        c == '.' || c == ':' || c == '@'
 
 
     val keywords: Set[String] = Set(
-    "abstract", "assert", "boolean", "break", "byte", "case", "catch", "char", "class", "const",
-    "continue", "default", "do", "double", "else", "enum", "extends", "final", "finally", "float",
-    "for", "goto", "if", "implements", "import", "instanceof", "int", "interface", "long",
-    "native", "new", "package", "private", "protected", "public", "return", "short", "static",
-    "strictfp", "super", "switch", "synchronized", "this", "throw", "throws", "transient",
-    "try", "void", "volatile", "while"
+        "abstract", "assert", "boolean", "break", "byte", "case", "catch", "char", "class", "const",
+        "continue", "default", "do", "double", "else", "enum", "extends", "final", "finally", "float",
+        "for", "goto", "if", "implements", "import", "instanceof", "int", "interface", "long",
+        "native", "new", "package", "private", "protected", "public", "return", "short", "static",
+        "strictfp", "super", "switch", "synchronized", "this", "throw", "throws", "transient",
+        "try", "void", "volatile", "while"
     )
 
     def identifier(lexeme: String): (Token, Long) =
-        nextChar match
-            case Some(c) if c.isLetterOrDigit || c == '_' || c == '$' => identifier(lexeme + c)
+        peek match
+            case Some(c) if c.isLetterOrDigit || c == '_' || c == '$' => skipChar; identifier(lexeme + c)
             case Some(c) if isSeparator(c) || c.isWhitespace => (Token.Identifier(lexeme), index)
+            case Some(c) if c.isWhitespace => skipChar; (Token.Identifier(lexeme), index)
             case Some(e) => 
                 ERROR("Identifier contains illegal character $e")
             case None => (Token.Identifier(lexeme), index)
 
     def intLiteral(lexeme: String)(f: Char => Boolean): (Token, Long) = 
-        nextChar match
-            case Some(c) if f(c) => intLiteral(lexeme + c)(f)
+        peek match
+            case Some(c) if f(c) => skipChar; intLiteral(lexeme + c)(f)
             case Some('l') | Some('L') => skipChar; (Token.Literal(lexeme), index)
             case Some(c) if c.isLetterOrDigit => ERROR()
             case Some('_') =>
@@ -80,54 +77,53 @@ class Lexer(filename: String):
                     case Some(c) if c.isDigit => intLiteral(lexeme)(f)
                     case Some(_) | None => ERROR() 
             case Some('.') => if f == isDec then floatLiteral(lexeme + '.') else ERROR()
-            case Some(c) if isSeparator(c) || isOperator(c) || c.isWhitespace => (Token.Literal(lexeme), index)
+            case Some(c) if isSeparator(c) || isOperator(c) => (Token.Literal(lexeme), index)
+            case Some(c) if c.isWhitespace => skipChar; (Token.Literal(lexeme), index)
             case Some(_) => ERROR()
             case None if lexeme.nonEmpty => (Token.Literal(lexeme), index)
             case None => ERROR()
 
-
     def floatLiteral(lexeme: String): (Token, Long) =
-        nextChar match
-            case Some(c) if c.isDigit => floatLiteral(lexeme + c)
+        peek match
+            case Some(c) if c.isDigit => skipChar; floatLiteral(lexeme + c)
             case Some('F') | Some('f') => skipChar; (Token.Literal(lexeme), index)
-            case Some('d') => (Token.Literal(lexeme), index)
+            case Some('d') => skipChar; (Token.Literal(lexeme), index)
             case Some('.') => ERROR()
             case Some(c) if c.isLetter => ERROR()
-            case Some(_) => (Token.Literal(lexeme), index)
+            case Some(c) if isOperator(c) || isSeparator(c) => (Token.Literal(lexeme), index)
+            case Some(c) if c.isWhitespace => skipChar; (Token.Literal(lexeme), index)
+            case Some(_) => ERROR()
             case None if lexeme.charAt(lexeme.length-1) == '.' => ERROR()
             case None => (Token.Literal(lexeme), index)
 
     def stringLiteral(lexeme: String): (Token, Long) = 
-        nextChar match
-            case Some('"') => (Token.Literal(lexeme), index)
-            case Some('\\') => 
-                nextChar match
-                    case Some(c) => 
+        peek match
+            case Some('"') => skipChar; (Token.Literal(lexeme), index)
+            case Some('\\') =>
+                peek match
+                    case Some(c) => skipChar; 
                         if isEscapeChar(c) then stringLiteral(lexeme + ("\\" + c).translateEscapes)
                         else stringLiteral(lexeme + c)
                     case None => ERROR("Unclosed string literal")
-            case Some(c) => stringLiteral(lexeme + c)
+            case Some(c) => skipChar; stringLiteral(lexeme + c)
             case None => ERROR("Unclosed string literal")
  
     def operator(lexeme: String): (Token, Long) =
-        nextChar match
+        peek match
             case Some(c) 
                 if lexeme.length == 1 && isOperator(c) && c == '=' || lexeme.charAt(0) == c && !isSingleOp(c)
-                => operator(lexeme + c)
-            case Some('=') if lexeme == ">>" || lexeme == "<<" => operator(lexeme + '=')
+                => skipChar; operator(lexeme + c)
+            case Some('=') if lexeme == ">>" || lexeme == "<<" => skipChar; operator(lexeme + '=')
             case Some(c) if !isOperator(c) => (Token.Operator(lexeme), index)
             case Some(_) => ERROR()
             case None => (Token.Operator(lexeme), index)
 
     def nextToken(pos: Long): (Token, Long) = 
-        source.seek(pos)
-        println(source.length)
-        println(s"Getting next token starting from positon $pos")
         nextChar match
             case Some(c) =>
                 val curLexeme = c.toString
                 if c.isWhitespace then
-                    nextToken(pos + 1) 
+                    nextToken(pos + 1)
                 else if c.isLetter || c == '_' || c == '$' then 
                     identifier(curLexeme) match
                         case (Token.Identifier(id), i) if keywords contains id => (Token.Keyword(id), i)
@@ -141,16 +137,24 @@ class Lexer(filename: String):
                 else if c.isDigit then
                     intLiteral(curLexeme)(isDec)
                 else if c == '.' then
-                    floatLiteral(curLexeme)
+                    peek match
+                        case Some(c) if c.isDigit => floatLiteral(curLexeme)
+                        case Some(_) | None => (Token.Separator(curLexeme), index)                    
                 else if c == '"' then
                     stringLiteral(curLexeme)
                 else if isOperator(c) then
                     operator(curLexeme)
                 else if isSeparator(c) then
-                    println("SEPARATOR")
                     (c, peek) match
                         case (':', Some(':')) => skipChar; (Token.Separator("::"), index)
                         case _ => (Token.Separator(curLexeme), index)
                 else
                     ERROR("Unrecognized lexeme")
-            case None => println("ERROR(): EOF"); (Token.EOF, source.length)
+            case None => (Token.EOF, source.length)
+
+    def lexFile: List[Token] =
+        def loop(i: Long, xs: List[Token]): List[Token] =
+            this.nextToken(i) match
+                case (Token.Invalid, _) | (Token.EOF, _) => xs.reverse
+                case (token, j) => loop(j, token :: xs)
+        loop(0, List())
